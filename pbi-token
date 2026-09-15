@@ -1,0 +1,81 @@
+#!/bin/bash
+# Power BI Token Management CLI
+# Quick access to all Power BI token operations
+
+SCRIPT_DIR="$HOME/.claude/powerbi"
+
+show_help() {
+    cat << EOF
+Power BI MCP Token Management
+
+Usage: pbi-token <command>
+
+Commands:
+    refresh         Manually refresh the token
+    auto            Check connection and refresh if needed
+    status          Show current MCP connection status
+    logs            Show recent token refresh logs
+    check           Check if powerbi-remote is connected
+    help            Show this help message
+
+Examples:
+    pbi-token refresh       # Force refresh token now
+    pbi-token auto          # Auto-refresh if connection failed
+    pbi-token status        # Check MCP connection status
+    pbi-token logs          # View recent refresh logs
+
+Automatic Refresh:
+    Tokens are automatically refreshed every hour by cron job.
+    Run 'claude cron list' to see scheduled jobs.
+
+Files:
+    Config:  $SCRIPT_DIR/credentials.json
+    Logs:    $SCRIPT_DIR/token-refresh.log
+    Scripts: $SCRIPT_DIR/*.sh
+
+EOF
+}
+
+case "${1:-help}" in
+    refresh)
+        echo "🔄 Manually refreshing Power BI token..."
+        bash "$SCRIPT_DIR/refresh-token.sh"
+        echo ""
+        echo "✅ Token refreshed. Reload VSCode to reconnect:"
+        echo "   Cmd+Shift+P → 'Developer: Reload Window'"
+        ;;
+    auto)
+        bash "$SCRIPT_DIR/auto-refresh-token.sh"
+        ;;
+    status)
+        echo "📊 Power BI MCP Connection Status:"
+        echo ""
+        claude mcp list | grep -A 1 "powerbi" || echo "No Power BI servers found"
+        ;;
+    check)
+        if claude mcp list 2>&1 | grep "powerbi-remote" | grep -q "✔ Connected"; then
+            echo "✅ powerbi-remote is connected"
+            exit 0
+        else
+            echo "❌ powerbi-remote is not connected"
+            exit 1
+        fi
+        ;;
+    logs)
+        if [ -f "$SCRIPT_DIR/token-refresh.log" ]; then
+            echo "📝 Recent token refresh logs:"
+            echo ""
+            tail -20 "$SCRIPT_DIR/token-refresh.log"
+        else
+            echo "No logs found at $SCRIPT_DIR/token-refresh.log"
+        fi
+        ;;
+    help|--help|-h)
+        show_help
+        ;;
+    *)
+        echo "Unknown command: $1"
+        echo "Run 'pbi-token help' for usage"
+        exit 1
+        ;;
+esac
